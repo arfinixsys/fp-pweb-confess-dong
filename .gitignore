@@ -1,0 +1,82 @@
+# Dependencies
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+package-lock.json  # opsional, tapi biasanya di-ignore
+yarn.lock          # opsional
+
+# Environment variables
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Database SQLite
+*.sqlite
+*.sqlite3
+*.db
+database.sqlite
+db.sqlite3
+
+# Build output (React)
+build/
+dist/
+.next/
+out/
+
+# React
+.eslintcache
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+pids
+*.pid
+*.seed
+*.pid.lock
+
+# OS files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+desktop.ini
+
+# IDE/Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.project
+.classpath
+.settings/
+
+# Temporary files
+*.tmp
+.cache/
+.temp/
+*.bak
+
+# Coverage directory
+coverage/
+.nyc_output/
+
+# Optional npm cache directory
+.npm
+
+# Optional eslint cache
+.eslintcache
+
+# Uploads (jika ada fitur upload file)
+uploads/*
+!uploads/.gitkeep
+
+# Mac files
+**/.DS_Store
