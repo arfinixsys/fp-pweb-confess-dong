@@ -1,0 +1,7 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+body { font-family: 'Inter', sans-serif; background: white; }
+.btn-primary { @apply bg-primary-500 text-white font-semibold py-2 px-4 rounded-2xl shadow-md; }
+.card { @apply bg-white rounded-2xl shadow p-4; }

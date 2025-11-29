@@ -1,0 +1,129 @@
+{
+  "info": {
+    "name": "Confess Dong API",
+    "_postman_id": "confess-dong-collection",
+    "description": "Collection for testing Confess Dong API endpoints",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Create Message",
+      "request": {
+        "method": "POST",
+        "header": [],
+        "body": {
+          "mode": "formdata",
+          "formdata": [
+            { "key": "sender_name", "value": "Alice", "type": "text" },
+            { "key": "is_anonymous", "value": "1", "type": "text" },
+            { "key": "recipient_name", "value": "Dina", "type": "text" },
+            { "key": "message", "value": "Hello from Postman", "type": "text" },
+            { "key": "image", "src": "", "type": "file" }
+          ]
+        },
+        "url": { "raw": "{{baseUrl}}/messages", "host": ["{{baseUrl}}"], "path": ["messages"] }
+      }
+    },
+    {
+      "name": "Report Message",
+      "request": {
+        "method": "POST",
+        "header": [{"key":"Content-Type","value":"application/json"}],
+        "body": { "mode": "raw", "raw": "{ \"reason\": \"spam\" }" },
+        "url": { "raw": "{{baseUrl}}/messages/:id/report", "host": ["{{baseUrl}}"], "path": ["messages", ":id", "report"] }
+      }
+    },
+    {
+      "name": "Like Message",
+      "request": {
+        "method": "POST",
+        "header": [],
+        "url": { "raw": "{{baseUrl}}/messages/:id/like", "host": ["{{baseUrl}}"], "path": ["messages", ":id", "like"] }
+      }
+    },
+    {
+      "name": "Upload Image for Message",
+      "request": {
+        "method": "POST",
+        "header": [],
+        "body": {
+          "mode": "formdata",
+          "formdata": [ { "key": "image", "src": "", "type": "file" } ]
+        },
+        "url": { "raw": "{{baseUrl}}/messages/:id/image", "host": ["{{baseUrl}}"], "path": ["messages", ":id", "image"] }
+      }
+    },
+    {
+      "name": "List Messages",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": { "raw": "{{baseUrl}}/messages?page=1&pageSize=10", "host": ["{{baseUrl}}"], "path": ["messages"], "query": [ {"key":"page","value":"1"}, {"key":"pageSize","value":"10"} ] }
+      }
+    },
+    {
+      "name": "Get Message",
+      "request": { "method": "GET", "header": [], "url": { "raw": "{{baseUrl}}/messages/:id", "host": ["{{baseUrl}}"], "path": ["messages", ":id"] } }
+    },
+    {
+      "name": "List By Recipient",
+      "request": { "method": "GET", "header": [], "url": { "raw": "{{baseUrl}}/messages/recipient/:name", "host": ["{{baseUrl}}"], "path": ["messages","recipient",":name"] } }
+    },
+    {
+      "name": "Admin: List Messages",
+      "request": {
+        "method": "GET",
+        "header": [ { "key": "x-admin-token", "value": "{{admin_token}}" } ],
+        "url": { "raw": "{{baseUrl}}/admin/messages", "host": ["{{baseUrl}}"], "path": ["admin","messages"] }
+      }
+    },
+    {
+      "name": "Update Message (PUT)",
+      "request": {
+        "method": "PUT",
+        "header": [],
+        "body": { "mode": "formdata", "formdata": [ { "key": "recipient_name", "value": "Dina Updated", "type": "text" }, { "key": "message", "value": "Updated message", "type": "text" }, { "key": "is_anonymous", "value": "0", "type": "text" }, { "key": "image", "src": "", "type": "file" } ] },
+        "url": { "raw": "{{baseUrl}}/messages/:id", "host": ["{{baseUrl}}"], "path": ["messages", ":id"] }
+      }
+    },
+    {
+      "name": "Patch: Anonymize",
+      "request": {
+        "method": "PATCH",
+        "header": [{"key":"Content-Type","value":"application/json"}],
+        "body": { "mode": "raw", "raw": "{ \"is_anonymous\": 1 }" },
+        "url": { "raw": "{{baseUrl}}/messages/:id/anonymize", "host": ["{{baseUrl}}"], "path": ["messages", ":id", "anonymize"] }
+      }
+    },
+    {
+      "name": "Patch: Approve",
+      "request": {
+        "method": "PATCH",
+        "header": [{"key":"Content-Type","value":"application/json"}],
+        "body": { "mode": "raw", "raw": "{ \"is_approved\": 1 }" },
+        "url": { "raw": "{{baseUrl}}/messages/:id/approve", "host": ["{{baseUrl}}"], "path": ["messages", ":id", "approve"] }
+      }
+    },
+    {
+      "name": "Delete Message (hard)",
+      "request": { "method": "DELETE", "header": [], "url": { "raw": "{{baseUrl}}/messages/:id", "host": ["{{baseUrl}}"], "path": ["messages", ":id"] } }
+    },
+    {
+      "name": "Delete Message (soft)",
+      "request": { "method": "DELETE", "header": [], "url": { "raw": "{{baseUrl}}/messages/:id/soft", "host": ["{{baseUrl}}"], "path": ["messages", ":id", "soft"] } }
+    },
+    {
+      "name": "Delete Upload",
+      "request": { "method": "DELETE", "header": [], "url": { "raw": "{{baseUrl}}/uploads/:id", "host": ["{{baseUrl}}"], "path": ["uploads", ":id"] } }
+    },
+    {
+      "name": "Bulk Delete Messages",
+      "request": {
+        "method": "DELETE",
+        "header": [{"key":"Content-Type","value":"application/json"}],
+        "body": { "mode": "raw", "raw": "{ \"ids\": [1,2,3] }" },
+        "url": { "raw": "{{baseUrl}}/messages/bulk", "host": ["{{baseUrl}}"], "path": ["messages","bulk"] }
+      }
+    }
+  ]
+}
