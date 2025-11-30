@@ -13,8 +13,12 @@ CREATE TABLE IF NOT EXISTS messages (
   is_deleted INTEGER DEFAULT 0,
   is_approved INTEGER DEFAULT 0,
   reports_count INTEGER DEFAULT 0,
-  likes_count INTEGER DEFAULT 0
+  likes_count INTEGER DEFAULT 0,
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL
 );
+
+CREATE INDEX IF NOT EXISTS idx_messages_recipient_name ON messages(recipient_name);
+CREATE INDEX IF NOT EXISTS idx_messages_user_id ON messages(user_id);
 
 CREATE TABLE IF NOT EXISTS reports (
   id INTEGER PRIMARY KEY AUTOINCREMENT,

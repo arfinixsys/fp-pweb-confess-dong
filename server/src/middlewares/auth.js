@@ -1,7 +1,10 @@
 require('dotenv').config();
 const jwt = require('jsonwebtoken');
 
-const JWT_SECRET = process.env.JWT_SECRET || 'your_jwt_secret_key';
+if (!process.env.JWT_SECRET || process.env.JWT_SECRET === 'changeme-REPLACE_WITH_RANDOM_SECRET' || process.env.JWT_SECRET.length < 16) {
+  throw new Error('JWT_SECRET must be set in .env and be a strong random string (min 16 chars).');
+}
+const JWT_SECRET = process.env.JWT_SECRET;
 
 // Admin check via header x-admin-token
 const isAdmin = (req, res, next) => {
