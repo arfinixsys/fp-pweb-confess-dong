@@ -7,6 +7,7 @@ const path = require('path');
 const messagesRouter = require('./routes/messages');
 const uploadsRouter = require('./routes/upload');
 const adminRouter = require('./routes/admin');
+const authRouter = require('./routes/auth');
 const { errorHandler } = require('./middlewares/errorHandler');
 const { limiter } = require('./middlewares/rateLimiter');
 
@@ -26,6 +27,7 @@ app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 app.use('/api/v1/messages', messagesRouter);
 app.use('/api/v1/uploads', uploadsRouter);
 app.use('/api/v1/admin', adminRouter);
+app.use('/api/v1/auth', authRouter);
 
 // error
 app.use(errorHandler);

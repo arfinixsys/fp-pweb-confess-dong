@@ -4,14 +4,34 @@ const path = require('path');
 
 const createMessage = (req, res, next) => {
   try {
-    const { sender_name, is_anonymous = 0, recipient_name, message } = req.body;
+    // If route is protected, req.user may exist (from JWT)
+    const { sender_name: bodySenderName, is_anonymous: bodyAnon = 0, recipient_name, message } = req.body;
     if (!recipient_name || !message) return res.status(400).json({ success:false, message:'recipient and message required' });
+
+    // Environment flag to enforce login (if set true, always use authenticated user)
+    const REQUIRE_LOGIN_TO_SEND = process.env.REQUIRE_LOGIN_TO_SEND === '1' || process.env.REQUIRE_LOGIN_TO_SEND === 'true';
+
+    // Determine user and sender_name
+    const user = req.user || null;
+    let sender_name = bodySenderName || null;
+    let is_anonymous = bodyAnon ? 1 : 0;
+
+    if (user) {
+      // prefer username from token if available
+      sender_name = user.username || sender_name || null;
+      // allow logged-in users to choose anonymity unless REQUIRE_LOGIN_TO_SEND enforces visible identity
+      if (REQUIRE_LOGIN_TO_SEND) is_anonymous = 0;
+    } else if (REQUIRE_LOGIN_TO_SEND) {
+      // Shouldn't happen because route is protected, but guard anyway
+      return res.status(401).json({ success:false, message:'Login required to send messages' });
+    }
 
     let image_path = null;
     if (req.file) image_path = `/uploads/${req.file.filename}`;
 
-    const stmt = db.prepare('INSERT INTO messages (sender_name,is_anonymous,recipient_name,message,image_path) VALUES (?,?,?,?,?)');
-    const info = stmt.run(sender_name || null, is_anonymous ? 1 : 0, recipient_name, message, image_path);
+    const stmt = db.prepare('INSERT INTO messages (user_id,sender_name,is_anonymous,recipient_name,message,image_path) VALUES (?,?,?,?,?,?)');
+    const userId = user ? user.id : null;
+    const info = stmt.run(userId, sender_name || null, is_anonymous ? 1 : 0, recipient_name, message, image_path);
     const row = db.prepare('SELECT * FROM messages WHERE id = ?').get(info.lastInsertRowid);
     if (row.is_anonymous) row.sender_name = 'Anon';
     return res.status(201).json({ success:true, data: row });
@@ -65,6 +85,12 @@ const reportMessage = (req, res, next) => {
   try {
     const id = req.params.id;
     const reason = req.body.reason || null;
+    
+    // Verify message exists
+    const msgExists = db.prepare('SELECT id FROM messages WHERE id = ?').get(id);
+    if (!msgExists) return res.status(404).json({ success:false, message:'Message not found' });
+    
+    // Insert report
     db.prepare('INSERT INTO reports (message_id,reason) VALUES (?,?)').run(id, reason);
     db.prepare('UPDATE messages SET reports_count = reports_count + 1 WHERE id = ?').run(id);
     return res.json({ success:true, message:'Reported' });

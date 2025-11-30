@@ -1,12 +1,23 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import API from '../services/api';
 import { useNavigate } from 'react-router-dom';
 
 export default function NewMessage(){
-  const [form,setForm] = useState({ sender_name:'', is_anonymous:true, recipient_name:'', message:'' });
+  const storedUser = JSON.parse(localStorage.getItem('user') || '{}');
+  const [form,setForm] = useState({ sender_name: storedUser.username || '', is_anonymous:true, recipient_name:'', message:'' });
   const [image, setImage] = useState(null);
   const [loading, setLoading] = useState(false);
   const nav = useNavigate();
+  const token = localStorage.getItem('token');
+
+  useEffect(() => {
+    // If user is logged in and REQUIRE_LOGIN_TO_SEND enforced, ensure anonymity is off
+    const REQUIRE_LOGIN_TO_SEND = import.meta.env.VITE_REQUIRE_LOGIN_TO_SEND === '1' || import.meta.env.VITE_REQUIRE_LOGIN_TO_SEND === 'true';
+    if (storedUser.username) {
+      setForm(f => ({ ...f, sender_name: storedUser.username }));
+      if (REQUIRE_LOGIN_TO_SEND) setForm(f => ({ ...f, is_anonymous: false }));
+    }
+  }, [storedUser.username]);
 
   const submit = async (e) => {
     e.preventDefault();
@@ -19,7 +30,9 @@ export default function NewMessage(){
       fd.append('message', form.message);
       if (image) fd.append('image', image);
 
-      await API.post('/messages', fd, { headers: {'Content-Type':'multipart/form-data'} });
+      const headers = { 'Content-Type':'multipart/form-data' };
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+      await API.post('/messages', fd, { headers });
       alert('Terkirim!');
       nav('/');
     } catch (err) {

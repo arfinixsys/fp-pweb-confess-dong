@@ -1,0 +1,236 @@
+{
+  "info": {
+    "name": "Confess Dong API (Auto-fill ID)",
+    "_postman_id": "confess-dong-auto",
+    "description": "Collection dengan auto-fill baseUrl dan lastId",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Register User",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "if (pm.response.code === 201) {",
+              "  const body = pm.response.json();",
+              "  if (body.data && body.data.token) {",
+              "    pm.environment.set('userToken', body.data.token);",
+              "    pm.environment.set('userId', body.data.id);",
+              "    console.log('User registered & token saved: ' + body.data.username);",
+              "  }",
+              "}"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [{"key":"Content-Type","value":"application/json"}],
+        "body": { "mode": "raw", "raw": "{\"username\":\"testuser\",\"email\":\"test@example.com\",\"password\":\"password123\"}" },
+        "url": { "raw": "{{baseUrl}}/auth/register", "host": ["{{baseUrl}}"], "path": ["auth","register"] }
+      }
+    },
+    {
+      "name": "Login User",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "if (pm.response.code === 200) {",
+              "  const body = pm.response.json();",
+              "  if (body.data && body.data.token) {",
+              "    pm.environment.set('userToken', body.data.token);",
+              "    pm.environment.set('userId', body.data.id);",
+              "    console.log('Login successful, token saved');",
+              "  }",
+              "}"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [{"key":"Content-Type","value":"application/json"}],
+        "body": { "mode": "raw", "raw": "{\"username\":\"testuser\",\"password\":\"password123\"}" },
+        "url": { "raw": "{{baseUrl}}/auth/login", "host": ["{{baseUrl}}"], "path": ["auth","login"] }
+      }
+    },
+    {
+      "name": "Get User Profile",
+      "request": {
+        "method": "GET",
+        "header": [{"key":"Authorization","value":"Bearer {{userToken}}"}],
+        "url": { "raw": "{{baseUrl}}/auth/profile", "host": ["{{baseUrl}}"], "path": ["auth","profile"] }
+      }
+    },
+    {
+      "name": "Create Message (Ambil ID)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "if (pm.response.code === 201) {",
+              "  const body = pm.response.json();",
+              "  if (body.data && body.data.id) {",
+              "    pm.environment.set('lastId', body.data.id);",
+              "    console.log('ID berhasil disimpan: ' + body.data.id);",
+              "  }",
+              "}"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [],
+        "body": {
+          "mode": "formdata",
+          "formdata": [
+            { "key": "sender_name", "value": "Alice", "type": "text" },
+            { "key": "is_anonymous", "value": "1", "type": "text" },
+            { "key": "recipient_name", "value": "Dina", "type": "text" },
+            { "key": "message", "value": "Hello from Postman", "type": "text" }
+          ]
+        },
+        "url": { "raw": "{{baseUrl}}/messages", "host": ["{{baseUrl}}"], "path": ["messages"] }
+      }
+    },
+    {
+      "name": "Get Message (Pakai lastId)",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": { "raw": "{{baseUrl}}/messages/{{lastId}}", "host": ["{{baseUrl}}"], "path": ["messages", "{{lastId}}"] }
+      }
+    },
+    {
+      "name": "Like Message (Pakai lastId)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "if (pm.response.code === 200) {",
+              "  console.log('Like berhasil: ' + pm.response.json().data.likes_count + ' likes');",
+              "}"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [],
+        "url": { "raw": "{{baseUrl}}/messages/{{lastId}}/like", "host": ["{{baseUrl}}"], "path": ["messages", "{{lastId}}", "like"] }
+      }
+    },
+    {
+      "name": "Report Message (Pakai lastId)",
+      "request": {
+        "method": "POST",
+        "header": [{"key":"Content-Type","value":"application/json"}],
+        "body": { "mode": "raw", "raw": "{ \"reason\": \"spam\" }" },
+        "url": { "raw": "{{baseUrl}}/messages/{{lastId}}/report", "host": ["{{baseUrl}}"], "path": ["messages", "{{lastId}}", "report"] }
+      }
+    },
+    {
+      "name": "Upload Image for Message (Pakai lastId)",
+      "request": {
+        "method": "POST",
+        "header": [],
+        "body": {
+          "mode": "formdata",
+          "formdata": [ { "key": "image", "src": "", "type": "file" } ]
+        },
+        "url": { "raw": "{{baseUrl}}/messages/{{lastId}}/image", "host": ["{{baseUrl}}"], "path": ["messages", "{{lastId}}", "image"] }
+      }
+    },
+    {
+      "name": "List Messages",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": { "raw": "{{baseUrl}}/messages?page=1&pageSize=10", "host": ["{{baseUrl}}"], "path": ["messages"], "query": [ {"key":"page","value":"1"}, {"key":"pageSize","value":"10"} ] }
+      }
+    },
+    {
+      "name": "List By Recipient",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": { "raw": "{{baseUrl}}/messages/recipient/Dina", "host": ["{{baseUrl}}"], "path": ["messages","recipient","Dina"] }
+      }
+    },
+    {
+      "name": "Admin: List Messages",
+      "request": {
+        "method": "GET",
+        "header": [ { "key": "x-admin-token", "value": "{{admin_token}}" } ],
+        "url": { "raw": "{{baseUrl}}/admin/messages", "host": ["{{baseUrl}}"], "path": ["admin","messages"] }
+      }
+    },
+    {
+      "name": "Update Message (Pakai lastId)",
+      "request": {
+        "method": "PUT",
+        "header": [],
+        "body": { "mode": "formdata", "formdata": [ { "key": "recipient_name", "value": "Dina Updated", "type": "text" }, { "key": "message", "value": "Updated message", "type": "text" }, { "key": "is_anonymous", "value": "0", "type": "text" } ] },
+        "url": { "raw": "{{baseUrl}}/messages/{{lastId}}", "host": ["{{baseUrl}}"], "path": ["messages", "{{lastId}}"] }
+      }
+    },
+    {
+      "name": "Anonymize (Pakai lastId)",
+      "request": {
+        "method": "PATCH",
+        "header": [{"key":"Content-Type","value":"application/json"}],
+        "body": { "mode": "raw", "raw": "{ \"is_anonymous\": 1 }" },
+        "url": { "raw": "{{baseUrl}}/messages/{{lastId}}/anonymize", "host": ["{{baseUrl}}"], "path": ["messages", "{{lastId}}", "anonymize"] }
+      }
+    },
+    {
+      "name": "Approve (Pakai lastId)",
+      "request": {
+        "method": "PATCH",
+        "header": [{"key":"Content-Type","value":"application/json"}],
+        "body": { "mode": "raw", "raw": "{ \"is_approved\": 1 }" },
+        "url": { "raw": "{{baseUrl}}/messages/{{lastId}}/approve", "host": ["{{baseUrl}}"], "path": ["messages", "{{lastId}}", "approve"] }
+      }
+    },
+    {
+      "name": "Soft Delete (Pakai lastId)",
+      "request": {
+        "method": "DELETE",
+        "header": [],
+        "url": { "raw": "{{baseUrl}}/messages/{{lastId}}/soft", "host": ["{{baseUrl}}"], "path": ["messages", "{{lastId}}", "soft"] }
+      }
+    },
+    {
+      "name": "Hard Delete (Pakai lastId)",
+      "request": {
+        "method": "DELETE",
+        "header": [],
+        "url": { "raw": "{{baseUrl}}/messages/{{lastId}}", "host": ["{{baseUrl}}"], "path": ["messages", "{{lastId}}"] }
+      }
+    },
+    {
+      "name": "Delete Upload",
+      "request": {
+        "method": "DELETE",
+        "header": [],
+        "url": { "raw": "{{baseUrl}}/uploads/1", "host": ["{{baseUrl}}"], "path": ["uploads", "1"] }
+      }
+    },
+    {
+      "name": "Bulk Delete Messages",
+      "request": {
+        "method": "DELETE",
+        "header": [{"key":"Content-Type","value":"application/json"}],
+        "body": { "mode": "raw", "raw": "{ \"ids\": [1,2,3] }" },
+        "url": { "raw": "{{baseUrl}}/messages/bulk", "host": ["{{baseUrl}}"], "path": ["messages","bulk"] }
+      }
+    }
+  ]
+}

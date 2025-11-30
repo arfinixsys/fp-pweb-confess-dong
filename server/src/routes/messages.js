@@ -3,9 +3,10 @@ const router = express.Router();
 const multer = require('multer');
 const upload = multer({ dest: 'uploads/' });
 const ctrl = require('../controllers/messagesControllers');
+const { isAuthenticated } = require('../middlewares/auth');
 
-// Create
-router.post('/', upload.single('image'), ctrl.createMessage);
+// Create (authenticated users only)
+router.post('/', isAuthenticated, upload.single('image'), ctrl.createMessage);
 router.post('/:id/report', ctrl.reportMessage);
 router.post('/:id/like', ctrl.likeMessage);
 router.post('/:id/image', upload.single('image'), ctrl.updateImage);
