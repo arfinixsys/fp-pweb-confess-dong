@@ -2,6 +2,18 @@
 @tailwind components;
 @tailwind utilities;
 
-body { font-family: 'Inter', sans-serif; background: white; }
-.btn-primary { @apply bg-primary-500 text-white font-semibold py-2 px-4 rounded-2xl shadow-md; }
-.card { @apply bg-white rounded-2xl shadow p-4; }
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap');
+
+body {
+  @apply bg-dark-900 text-slate-200 font-sans antialiased;
+  background-image: 
+    radial-gradient(circle at 10% 20%, rgba(236, 72, 153, 0.1) 0%, transparent 40%),
+    radial-gradient(circle at 90% 80%, rgba(139, 92, 246, 0.1) 0%, transparent 40%);
+  min-height: 100vh;
+}
+
+/* Scrollbar Keren */
+::-webkit-scrollbar { width: 8px; }
+::-webkit-scrollbar-track { @apply bg-dark-900; }
+::-webkit-scrollbar-thumb { @apply bg-dark-700 rounded-full; }
+::-webkit-scrollbar-thumb:hover { @apply bg-primary-500; }

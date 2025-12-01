@@ -9,6 +9,7 @@ const { isAuthenticated } = require('../middlewares/auth');
 router.post('/', isAuthenticated, upload.single('image'), ctrl.createMessage);
 router.post('/:id/report', ctrl.reportMessage);
 router.post('/:id/like', ctrl.likeMessage);
+router.post('/:id/unlike', ctrl.unlikeMessage);
 router.post('/:id/image', upload.single('image'), ctrl.updateImage);
 
 // Read

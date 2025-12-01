@@ -106,6 +106,16 @@ const likeMessage = (req, res, next) => {
   } catch (err) { next(err); }
 };
 
+const unlikeMessage = (req, res, next) => {
+  try {
+    const id = req.params.id;
+    // Logika: Kurangi 1, tapi jangan sampai minus (MAX 0)
+    db.prepare('UPDATE messages SET likes_count = MAX(0, likes_count - 1) WHERE id = ?').run(id);
+    const row = db.prepare('SELECT likes_count FROM messages WHERE id = ?').get(id);
+    return res.json({ success:true, data: row });
+  } catch (err) { next(err); }
+};
+
 const updateMessage = (req, res, next) => {
   try {
     const id = req.params.id;
@@ -179,6 +189,6 @@ const bulkDelete = (req,res,next) => {
 
 module.exports = {
   createMessage, listMessages, getMessage, listByRecipient,
-  reportMessage, likeMessage, updateMessage, setAnonymize, setApprove, updateImage,
+  reportMessage, likeMessage, unlikeMessage, updateMessage, setAnonymize, setApprove, updateImage,
   deleteMessage, softDeleteMessage, bulkDelete
 };
