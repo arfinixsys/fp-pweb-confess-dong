@@ -9,8 +9,6 @@
   <li>User-friendly interface</li>
   <li>Responsive design for mobile and desktop</li>
   <li>Moderation tools to ensure a respectful community</li>
-  <li>Search and filter confessions by tags or keywords</li>
-  <li>Option to upvote or comment on confessions</li>
   <li>User authentication and authorization for secure access</li>
 </ul>
 
