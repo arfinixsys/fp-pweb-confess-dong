@@ -5,26 +5,25 @@ const upload = multer({ dest: 'uploads/' });
 const ctrl = require('../controllers/messagesControllers');
 const { isAuthenticated } = require('../middlewares/auth');
 
-// Create (authenticated users only)
+// CREATE
 router.post('/', isAuthenticated, upload.single('image'), ctrl.createMessage);
 router.post('/:id/report', ctrl.reportMessage);
-router.post('/:id/like', ctrl.likeMessage);
-router.post('/:id/unlike', ctrl.unlikeMessage);
-router.post('/:id/image', upload.single('image'), ctrl.updateImage);
+router.post('/:id/like', ctrl.likeMessage);      // ← endpoint like
+router.post('/:id/unlike', ctrl.unlikeMessage);  // ← endpoint unlike
 
-// Read
+// READ
 router.get('/', ctrl.listMessages);
 router.get('/recipient/:name', ctrl.listByRecipient);
 router.get('/:id', ctrl.getMessage);
 
-// Update
+// UPDATE
 router.put('/:id', upload.single('image'), ctrl.updateMessage);
 router.patch('/:id/anonymize', ctrl.setAnonymize);
 router.patch('/:id/approve', ctrl.setApprove);
 
-// Delete
-router.delete('/:id', ctrl.deleteMessage);
-router.delete('/:id/soft', ctrl.softDeleteMessage);
+// DELETE
 router.delete('/bulk', ctrl.bulkDelete);
+router.delete('/:id/soft', ctrl.softDeleteMessage);
+router.delete('/:id', ctrl.deleteMessage);
 
 module.exports = router;

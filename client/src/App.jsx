@@ -6,12 +6,14 @@ import Register from './pages/Register';
 import NewMessage from './pages/NewMessage';
 import MessageDetail from './pages/MessageDetails';
 import AdminPanel from './pages/AdminPanel';
+import AdminLogin from './pages/AdminLogin';
 
 // Komponen Navbar
 const Navbar = () => {
   const navigate = useNavigate();
   const userStr = localStorage.getItem('user');
   const token = localStorage.getItem('token');
+  const adminToken = localStorage.getItem('adminToken'); // ← tambah cek admin token
   
   // Parsing User agar aman
   let username = 'User';
@@ -38,12 +40,28 @@ const Navbar = () => {
           <div className="flex items-center space-x-4">
             <Link to="/" className="text-slate-300 hover:text-white px-3 py-2 text-sm font-medium">Home</Link>
             
+            {/* Link Admin - tampil untuk semua user */}
+            {adminToken ? (
+              <Link 
+                to="/admin" 
+                className="text-primary-400 hover:text-primary-300 text-sm font-medium border border-primary-500/30 px-3 py-1.5 rounded-lg hover:bg-primary-500/10 transition"
+              >
+                🔐 Admin Panel
+              </Link>
+            ) : (
+              <Link 
+                to="/admin/login" 
+                className="text-slate-400 hover:text-slate-300 text-sm font-medium"
+              >
+                Admin
+              </Link>
+            )}
+
             {token ? (
               <>
                 <Link to="/new" className="hidden sm:block bg-primary-500 hover:bg-primary-600 text-white px-4 py-2 rounded-full text-sm font-bold shadow-lg shadow-primary-500/30 transition transform hover:scale-105">
                   + Buat Pesan
                 </Link>
-                <Link to="/admin" className="text-slate-400 hover:text-white text-sm font-medium">Admin</Link>
                 <div className="flex items-center gap-3 pl-4 border-l border-dark-700 ml-2">
                   <div className="text-right hidden md:block">
                     <p className="text-xs text-slate-400">Login sebagai</p>
@@ -79,6 +97,7 @@ export default function App() {
           <Route path="/register" element={<Register />} />
           <Route path="/new" element={<NewMessage />} />
           <Route path="/messages/:id" element={<MessageDetail />} />
+          <Route path="/admin/login" element={<AdminLogin />} /> {/* ← tambah route ini */}
           <Route path="/admin" element={<AdminPanel />} />
         </Routes>
       </main>

@@ -1,140 +1,172 @@
 import React, { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import API from '../services/api';
 
 export default function AdminPanel() {
   const [msgs, setMsgs] = useState([]);
-  
-  // =======================================================
-  // KITA TULIS MANUAL (HARDCODE) BIAR 100% WORK
-  // =======================================================
-  // Samakan persis dengan yang di .env server tadi
-const ADMIN_TOKEN = "rahasia123";
+  const [loading, setLoading] = useState(true);
+  const nav = useNavigate();
+
+  const loadMessages = async () => {
+    try {
+      const token = localStorage.getItem('adminToken');
+      
+      if (!token) {
+        alert('Token admin tidak ditemukan. Redirect ke login...');
+        nav('/admin/login'); // ← redirect otomatis
+        return;
+      }
+
+      setLoading(true);
+      const res = await API.get('/admin/messages', { 
+        headers: { 'x-admin-token': token } 
+      });
+      
+      setMsgs(res.data.data || []);
+    } catch (err) {
+      console.error('Error loadMessages:', err);
+      
+      // Kalau 401 (unauthorized), redirect ke login
+      if (err.response?.status === 401) {
+        alert('Sesi admin expired. Login ulang.');
+        localStorage.removeItem('adminToken');
+        nav('/admin/login');
+        return;
+      }
+      
+      alert('Gagal memuat pesan admin: ' + (err.response?.data?.message || err.message));
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
     loadMessages();
   }, []);
 
-  const loadMessages = () => {
-    API.get('/admin/messages', { headers: { 'x-admin-token': ADMIN_TOKEN } })
-      .then(r => setMsgs(r.data.data))
-      .catch(function (err) { 
-        console.error(err);
-        alert('Gagal Masuk: Pastikan Terminal Server (Backend) sudah direstart setelah ganti .env!'); 
+  const handleApprove = async (id) => {
+    if (!window.confirm('Approve message ini?')) return;
+    try {
+      const token = localStorage.getItem('adminToken');
+      await API.patch(`/messages/${id}/approve`, { is_approved: true }, { 
+        headers: { 'x-admin-token': token } 
       });
-  };
-
-  const handleApprove = (id) => {
-    if (confirm('Approve message ini?')) {
-      API.patch(`/messages/${id}/approve`, { is_approved: 1 }, { headers: { 'x-admin-token': ADMIN_TOKEN } })
-        .then(() => {
-          alert('Message approved ✅');
-          loadMessages();
-        })
-        .catch(err => alert('Error: ' + err.message));
+      alert('Message approved!');
+      loadMessages();
+    } catch (err) { 
+      alert('Error: ' + (err.response?.data?.message || err.message)); 
     }
   };
 
-  const handleSoftDelete = (id) => {
-    if (confirm('Soft delete message ini?')) {
-      API.delete(`/messages/${id}/soft`, { headers: { 'x-admin-token': ADMIN_TOKEN } })
-        .then(() => {
-          alert('Message soft deleted 🗑️');
-          loadMessages();
-        })
-        .catch(err => alert('Error: ' + err.message));
+  const handleSoftDelete = async (id) => {
+    if (!window.confirm('Soft delete message ini?')) return;
+    try {
+      const token = localStorage.getItem('adminToken');
+      await API.delete(`/messages/${id}/soft`, { 
+        headers: { 'x-admin-token': token } 
+      });
+      alert('Message soft deleted!');
+      loadMessages();
+    } catch (err) { 
+      alert('Error: ' + (err.response?.data?.message || err.message)); 
     }
   };
 
-  const handleHardDelete = (id) => {
-    if (confirm('Hapus PERMANEN dari database?')) {
-      API.delete(`/messages/${id}`, { headers: { 'x-admin-token': ADMIN_TOKEN } })
-        .then(() => {
-          alert('Message permanently deleted 💀');
-          loadMessages();
-        })
-        .catch(err => alert('Error: ' + err.message));
+  const handleHardDelete = async (id) => {
+    if (!window.confirm('Hapus PERMANEN? Tidak bisa dikembalikan!')) return;
+    try {
+      const token = localStorage.getItem('adminToken');
+      await API.delete(`/messages/${id}`, { 
+        headers: { 'x-admin-token': token } 
+      });
+      alert('Message deleted permanently!');
+      loadMessages();
+    } catch (err) { 
+      alert('Error: ' + (err.response?.data?.message || err.message)); 
+    }
+  };
+
+  const handleLogout = () => {
+    if (window.confirm('Logout dari admin?')) {
+      localStorage.removeItem('adminToken');
+      nav('/admin/login');
     }
   };
 
   return (
-    <div className="max-w-7xl mx-auto space-y-8">
-      {/* Header Admin */}
-      <div className="flex flex-col md:flex-row justify-between items-center bg-dark-800 p-6 rounded-2xl border border-dark-700 shadow-lg relative overflow-hidden">
-        <div className="absolute top-0 right-0 w-64 h-64 bg-primary-500/10 rounded-full blur-[80px] -mr-16 -mt-16 pointer-events-none"></div>
-        <div className="relative z-10">
-          <h2 className="text-3xl font-bold text-white flex items-center gap-3">
-             🛡️ Admin Dashboard
-          </h2>
-          <p className="text-slate-400 text-sm mt-1">
-            Status Token: <span className="text-green-400 font-mono text-xs bg-green-900/30 px-2 py-0.5 rounded border border-green-500/30">TERHUBUNG</span>
-          </p>
-        </div>
+    <div className="max-w-7xl mx-auto p-6">
+      <div className="flex justify-between items-center mb-6">
+        <h2 className="text-3xl text-white font-bold">Admin Dashboard</h2>
         <button 
-          onClick={loadMessages} 
-          className="mt-4 md:mt-0 bg-dark-700 hover:bg-dark-600 text-white px-5 py-2.5 rounded-xl text-sm font-bold transition border border-dark-600 shadow-lg flex items-center gap-2"
+          onClick={handleLogout}
+          className="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg"
         >
-          <span>🔄</span> Refresh Data
+          Logout
         </button>
       </div>
 
-      {/* Grid Kartu Pesan */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {msgs.length === 0 ? (
-           <div className="col-span-3 text-center py-20 bg-dark-800/30 rounded-3xl border border-dashed border-dark-700">
-             <p className="text-slate-500 text-lg">Tidak ada pesan yang perlu dimoderasi.</p>
-           </div>
-        ) : (
-           msgs.map(m => (
-            <div key={m.id} className="bg-dark-800 border border-dark-700 p-6 rounded-2xl shadow-xl flex flex-col hover:border-primary-500/30 transition duration-300 relative group">
-              
-              {/* Metadata */}
-              <div className="flex justify-between items-start mb-4 border-b border-dark-700 pb-3">
-                <div>
-                    <div className="text-[10px] text-slate-500 uppercase tracking-widest font-bold">From</div>
-                    <div className="text-primary-400 font-bold truncate max-w-[120px]">{m.sender_name}</div>
-                </div>
-                <div className="text-right">
-                    <div className="text-[10px] text-slate-500 uppercase tracking-widest font-bold">To</div>
-                    <div className="text-slate-200 font-medium truncate max-w-[120px]">{m.recipient_name}</div>
-                </div>
-              </div>
-              
-              {/* Isi Pesan */}
-              <div className="flex-grow">
-                 <p className="text-slate-300 italic text-sm leading-relaxed mb-4 bg-dark-900/50 p-3 rounded-lg border border-dark-700/50 min-h-[80px]">
-                   "{m.message}"
-                 </p>
-                 <div className="text-xs text-slate-600 mb-4 text-right">
-                   {new Date(m.created_at).toLocaleString()}
-                 </div>
-              </div>
-              
-              {/* Action Buttons */}
-              <div className="grid grid-cols-3 gap-2 mt-auto pt-4 border-t border-dark-700">
-                <button 
-                  onClick={() => handleApprove(m.id)} 
-                  className="bg-green-500/10 text-green-500 hover:bg-green-600 hover:text-white py-2 rounded-lg text-xs font-bold transition border border-green-500/20 flex flex-col items-center justify-center gap-1"
-                >
-                  <span>✅</span> Approve
-                </button>
-                <button 
-                  onClick={() => handleSoftDelete(m.id)} 
-                  className="bg-yellow-500/10 text-yellow-500 hover:bg-yellow-600 hover:text-white py-2 rounded-lg text-xs font-bold transition border border-yellow-500/20 flex flex-col items-center justify-center gap-1"
-                >
-                  <span>🗑️</span> Soft Del
-                </button>
-                <button 
-                  onClick={() => handleHardDelete(m.id)} 
-                  className="bg-red-500/10 text-red-500 hover:bg-red-600 hover:text-white py-2 rounded-lg text-xs font-bold transition border border-red-500/20 flex flex-col items-center justify-center gap-1"
-                >
-                  <span>💀</span> Hard Del
-                </button>
-              </div>
+      <button 
+        onClick={loadMessages} 
+        className="bg-primary-500 hover:bg-primary-600 text-white px-4 py-2 rounded-lg mb-4"
+        disabled={loading}
+      >
+        {loading ? 'Loading...' : 'Refresh'}
+      </button>
 
+      {loading ? (
+        <p className="text-white text-center">Memuat pesan...</p>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {msgs.length === 0 ? (
+            <p className="text-slate-400 col-span-3 text-center">Tidak ada pesan.</p>
+          ) : msgs.map(m => (
+            <div key={m.id} className="bg-dark-800 p-4 rounded-lg border border-dark-700">
+              <div className="flex justify-between items-start mb-2">
+                <p className="text-white font-bold truncate flex-1">
+                  {m.sender_name} → {m.recipient_name}
+                </p>
+                <span className={`text-xs px-2 py-1 rounded ${
+                  m.is_approved ? 'bg-green-600' : 'bg-red-600'
+                }`}>
+                  {m.is_approved ? '✓ Approved' : '✗ Pending'}
+                </span>
+              </div>
+              <p className="text-slate-300 mt-2 line-clamp-3">{m.message}</p>
+              {m.image_path && (
+                <img 
+                  src={m.image_path} 
+                  alt="" 
+                  className="mt-2 rounded max-h-32 object-cover w-full"
+                  onError={(e) => e.target.style.display = 'none'}
+                />
+              )}
+              <div className="flex gap-2 mt-4">
+                <button 
+                  onClick={()=>handleApprove(m.id)} 
+                  className="px-2 py-1 bg-green-500 hover:bg-green-600 rounded text-white text-xs"
+                >
+                  ✅ Approve
+                </button>
+                <button 
+                  onClick={()=>handleSoftDelete(m.id)} 
+                  className="px-2 py-1 bg-yellow-500 hover:bg-yellow-600 rounded text-white text-xs"
+                >
+                  🗑️ Soft
+                </button>
+                <button 
+                  onClick={()=>handleHardDelete(m.id)} 
+                  className="px-2 py-1 bg-red-500 hover:bg-red-600 rounded text-white text-xs"
+                >
+                  💀 Hard
+                </button>
+              </div>
+              <p className="text-xs text-slate-500 mt-2">
+                ID: {m.id} | Likes: {m.likes_count} | Reports: {m.reports_count}
+              </p>
             </div>
-          ))
-        )}
-      </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

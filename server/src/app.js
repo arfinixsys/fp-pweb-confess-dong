@@ -8,6 +8,7 @@ const messagesRouter = require('./routes/messages');
 const uploadsRouter = require('./routes/upload');
 const adminRouter = require('./routes/admin');
 const authRouter = require('./routes/auth');
+const adminAuthRouter = require('./routes/adminAuth');
 const { errorHandler } = require('./middlewares/errorHandler');
 const { limiter } = require('./middlewares/rateLimiter');
 
@@ -28,6 +29,8 @@ app.use('/api/v1/messages', messagesRouter);
 app.use('/api/v1/uploads', uploadsRouter);
 app.use('/api/v1/admin', adminRouter);
 app.use('/api/v1/auth', authRouter);
+app.use('/api/v1/admin', adminAuthRouter);
+
 
 // error
 app.use(errorHandler);

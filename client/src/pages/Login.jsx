@@ -36,7 +36,7 @@ export default function Login() {
       const username = res.data.username || res.data.data?.username || form.username;
       localStorage.setItem('user', JSON.stringify({ username }));
       
-      alert('Login Berhasil! Token tersimpan: ' + token.substring(0, 10) + '...');
+      alert('Login Berhasil!');
       nav('/');
       window.location.reload(); 
     } catch (error) {

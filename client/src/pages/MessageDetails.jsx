@@ -1,108 +1,178 @@
-import React, { useEffect, useState } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { useParams, useNavigate, Link } from 'react-router-dom';
 import API from '../services/api';
 
-export default function MessageDetail(){
-  const { id } = useParams(); // Ambil ID dari URL
-  const [msg, setMsg] = useState(null);
-  const [isLiked, setIsLiked] = useState(false); // Status apakah user ini sudah like?
+export default function MessageDetail() {
+  const { id } = useParams();
+  const nav = useNavigate();
+  const [message, setMessage] = useState(null);
+  const [loading, setLoading] = useState(true);
 
-  useEffect(()=> {
-    // 1. Ambil Data Pesan dari Server
-    API.get(`/messages/${id}`).then(r=> setMsg(r.data.data)).catch(()=>{});
-
-    // 2. Cek LocalStorage (Apakah user pernah like pesan ini?)
-    // Kita convert ID ke integer/string biar aman saat mencocokkan
-    const storedLikes = JSON.parse(localStorage.getItem('liked_messages') || '[]');
-    // Cek apakah ID pesan ini (id) ada di dalam array storedLikes
-    // PENTING: id dari useParams itu string, storedLikes biasanya number/string. Kita samakan jadi string.
-    const alreadyLiked = storedLikes.some(likedId => String(likedId) === String(id));
-    
-    setIsLiked(alreadyLiked);
-  }, [id]);
-
-  // --- FUNGSI TOGGLE LIKE PINTAR ---
-  const handleToggleLike = async () => {
-    // Ambil daftar like lama
-    let storedLikes = JSON.parse(localStorage.getItem('liked_messages') || '[]');
-    
+  const loadMessage = async () => {
     try {
-      if (isLiked) {
-        // KASUS: SUDAH LIKE -> MAU UNLIKE
-        await API.post(`/messages/${id}/unlike`);
-        
-        // Update UI (Kurangi 1)
-        setMsg(prev => ({ ...prev, likes_count: Math.max(0, prev.likes_count - 1) }));
-        
-        // Update LocalStorage (Hapus ID ini)
-        storedLikes = storedLikes.filter(likedId => String(likedId) !== String(id));
-        
-        setIsLiked(false); // Ubah status tombol
-      } else {
-        // KASUS: BELUM LIKE -> MAU LIKE
-        await API.post(`/messages/${id}/like`);
-        
-        // Update UI (Tambah 1)
-        setMsg(prev => ({ ...prev, likes_count: (prev.likes_count || 0) + 1 }));
-        
-        // Update LocalStorage (Tambah ID ini)
-        storedLikes.push(id);
-        
-        setIsLiked(true); // Ubah status tombol
-      }
-      
-      // Simpan perubahan ke browser
-      localStorage.setItem('liked_messages', JSON.stringify(storedLikes));
-
-    } catch (error) {
-      console.error(error);
-      alert("Gagal memproses like");
+      const res = await API.get(`/messages/${id}`);
+      setMessage(res.data.data);
+    } catch (err) {
+      console.error('Error loading message:', err);
+      alert('Pesan tidak ditemukan!');
+      nav('/');
+    } finally {
+      setLoading(false);
     }
   };
 
-  if (!msg) return <div className="text-center text-slate-500 mt-20">Loading data...</div>;
+  useEffect(() => {
+    loadMessage();
+  }, [id]);
+
+  const handleLike = async () => {
+    try {
+      await API.post(`/messages/${id}/like`);
+      setMessage({ ...message, likes_count: (message.likes_count || 0) + 1 });
+    } catch (err) {
+      console.error('Error:', err);
+    }
+  };
+
+  const handleReport = async () => {
+    const reason = prompt('Alasan report (opsional):');
+    if (reason === null) return;
+    
+    try {
+      await API.post(`/messages/${id}/report`, { reason: reason || 'No reason' });
+      alert('✅ Pesan berhasil dilaporkan!');
+      setMessage({ ...message, reports_count: (message.reports_count || 0) + 1 });
+    } catch (err) {
+      alert('❌ Gagal melaporkan: ' + (err.response?.data?.message || err.message));
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="max-w-3xl mx-auto p-6 text-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-500 mx-auto"></div>
+        <p className="text-slate-400 mt-4">Memuat pesan...</p>
+      </div>
+    );
+  }
+
+  if (!message) {
+    return (
+      <div className="max-w-3xl mx-auto p-6 text-center">
+        <p className="text-slate-400">Pesan tidak ditemukan</p>
+        <Link to="/" className="text-primary-400 mt-4 inline-block">← Kembali ke Home</Link>
+      </div>
+    );
+  }
 
   return (
-    <div className="max-w-3xl mx-auto mt-10">
-      <Link to="/" className="text-slate-400 hover:text-white mb-4 inline-block">&larr; Kembali ke Timeline</Link>
-      
-      <div className="bg-dark-800 border border-dark-700 rounded-3xl p-8 shadow-2xl relative overflow-hidden">
-        {/* Hiasan Background */}
-        <div className="absolute top-0 right-0 w-64 h-64 bg-primary-500/10 rounded-full blur-[80px] pointer-events-none"></div>
+    <div className="max-w-3xl mx-auto p-6">
+      {/* Back Button */}
+      <Link 
+        to="/" 
+        className="text-primary-400 hover:text-primary-300 mb-6 inline-flex items-center gap-2"
+      >
+        ← Kembali
+      </Link>
 
-        <div className="flex items-center gap-4 mb-6 relative z-10">
-          <div className="w-16 h-16 rounded-full bg-gradient-to-tr from-primary-500 to-purple-600 flex items-center justify-center text-3xl font-bold text-white shadow-lg">
-            {msg.sender_name ? msg.sender_name.charAt(0).toUpperCase() : '?'}
-          </div>
-          <div>
-            <h1 className="text-2xl font-bold text-white">Kepada: {msg.recipient_name}</h1>
-            <p className="text-slate-400">Dari: <span className="text-primary-400 font-bold">{msg.sender_name}</span></p>
+      {/* Message Card */}
+      <div className="bg-dark-800 rounded-2xl p-8 border border-dark-700 shadow-xl">
+        {/* Header */}
+        <div className="flex items-start justify-between mb-6 pb-6 border-b border-dark-700">
+          <div className="flex items-center gap-4">
+            <div className="w-16 h-16 rounded-full bg-gradient-to-br from-primary-500 to-accent flex items-center justify-center text-white font-bold text-2xl shadow-lg">
+              {message.is_anonymous ? '🕵️' : (message.sender_name?.[0]?.toUpperCase() || 'U')}
+            </div>
+            
+            <div>
+              <p className="text-white font-bold text-xl flex items-center gap-2">
+                {message.is_anonymous ? (
+                  <span className="text-slate-400">Anon</span>
+                ) : (
+                  <span>{message.sender_name || 'User'}</span>
+                )}
+                
+                {message.is_anonymous && (
+                  <span className="text-xs bg-primary-500/20 text-primary-400 px-3 py-1 rounded-full">
+                    Anonymous
+                  </span>
+                )}
+              </p>
+              
+              <p className="text-slate-400 text-sm mt-1">
+                To: <span className="text-accent font-semibold text-base">{message.recipient_name}</span>
+              </p>
+              
+              <p className="text-slate-500 text-xs mt-2">
+                {new Date(message.created_at).toLocaleString('id-ID', {
+                  day: 'numeric',
+                  month: 'long',
+                  year: 'numeric',
+                  hour: '2-digit',
+                  minute: '2-digit'
+                })}
+              </p>
+            </div>
           </div>
         </div>
 
-        <div className="bg-dark-900/50 p-6 rounded-2xl border border-dark-700 mb-6 relative z-10">
-          <p className="text-2xl text-slate-200 leading-relaxed font-light italic">"{msg.message}"</p>
+        {/* Message Content */}
+        <div className="mb-6">
+          <p className="text-slate-200 text-lg leading-relaxed">
+            "{message.message}"
+          </p>
         </div>
 
-        {msg.image_path && (
-          <img src={`http://localhost:4000${msg.image_path}`} className="w-full rounded-2xl border border-dark-700 mb-6 shadow-md relative z-10" alt="evidence" />
+        {/* Image */}
+        {message.image_path && (
+          <div className="mb-6 rounded-xl overflow-hidden">
+            <img
+              src={message.image_path}
+              alt="Attachment"
+              className="w-full max-h-[500px] object-cover"
+              onError={(e) => e.target.style.display = 'none'}
+            />
+          </div>
         )}
 
-        <div className="flex gap-4 border-t border-dark-700 pt-6 relative z-10">
-          {/* TOMBOL LIKE YANG SUDAH DIPERBAIKI */}
-          <button 
-            onClick={handleToggleLike}
-            className={`flex items-center gap-2 px-6 py-2 rounded-full transition shadow-lg active:scale-95 ${
-              isLiked 
-                ? 'bg-pink-600 text-white shadow-pink-500/30 hover:bg-pink-700' // Style kalau sudah like
-                : 'bg-dark-700 text-slate-300 hover:bg-dark-600 hover:text-white' // Style kalau belum like
-            }`}
-          >
-            <span>{isLiked ? '❤️' : '🤍'}</span> 
-            <span className="font-bold">Like ({msg.likes_count || 0})</span>
-          </button>
+        {/* Actions */}
+        <div className="flex items-center justify-between pt-6 border-t border-dark-700">
+          <div className="flex items-center gap-6">
+            {/* Like */}
+            <button
+              onClick={handleLike}
+              className="flex items-center gap-3 px-4 py-2 bg-dark-900 hover:bg-red-500/10 border border-dark-700 hover:border-red-500/50 rounded-lg text-slate-400 hover:text-red-400 transition group"
+            >
+              <span className="text-2xl group-hover:scale-125 transition">❤️</span>
+              <span className="font-medium">{message.likes_count || 0} Likes</span>
+            </button>
+
+            {/* Report */}
+            <button
+              onClick={handleReport}
+              className="flex items-center gap-3 px-4 py-2 bg-dark-900 hover:bg-yellow-500/10 border border-dark-700 hover:border-yellow-500/50 rounded-lg text-slate-400 hover:text-yellow-400 transition group"
+            >
+              <span className="text-2xl group-hover:scale-125 transition">⚠️</span>
+              <span className="font-medium">Report</span>
+            </button>
+          </div>
+
+          {/* Stats */}
+          <div className="flex items-center gap-4 text-sm text-slate-500">
+            <span>💬 0 comments</span>
+            {message.reports_count > 0 && (
+              <span className="text-yellow-500">⚠️ {message.reports_count} reports</span>
+            )}
+          </div>
         </div>
+      </div>
+
+      {/* Comments Section (placeholder) */}
+      <div className="mt-8 bg-dark-800 rounded-xl p-6 border border-dark-700">
+        <h3 className="text-white font-bold mb-4">💬 Komentar</h3>
+        <p className="text-slate-400 text-sm">Fitur komentar segera hadir...</p>
       </div>
     </div>
   );
 }
+  

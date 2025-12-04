@@ -1,194 +1,360 @@
 const db = require('../models/db');
-const fs = require('fs');
-const path = require('path');
 
-const createMessage = (req, res, next) => {
+const createMessage = async (req, res, next) => {
   try {
-    // If route is protected, req.user may exist (from JWT)
-    const { sender_name: bodySenderName, is_anonymous: bodyAnon = 0, recipient_name, message } = req.body;
-    if (!recipient_name || !message) return res.status(400).json({ success:false, message:'recipient and message required' });
+    const { sender_name, is_anonymous, recipient_name, message, image_url } = req.body;
 
-    // Environment flag to enforce login (if set true, always use authenticated user)
-    const REQUIRE_LOGIN_TO_SEND = process.env.REQUIRE_LOGIN_TO_SEND === '1' || process.env.REQUIRE_LOGIN_TO_SEND === 'true';
+    if (!recipient_name || !message)
+      return res.status(400).json({ success: false, message: 'recipient and message required' });
 
-    // Determine user and sender_name
     const user = req.user || null;
-    let sender_name = bodySenderName || null;
-    let is_anonymous = bodyAnon ? 1 : 0;
 
-    if (user) {
-      // prefer username from token if available
-      sender_name = user.username || sender_name || null;
-      // allow logged-in users to choose anonymity unless REQUIRE_LOGIN_TO_SEND enforces visible identity
-      if (REQUIRE_LOGIN_TO_SEND) is_anonymous = 0;
-    } else if (REQUIRE_LOGIN_TO_SEND) {
-      // Shouldn't happen because route is protected, but guard anyway
-      return res.status(401).json({ success:false, message:'Login required to send messages' });
+    // ✅ LOGIC BARU:
+    let finalSender = null;
+    let finalAnon = is_anonymous === true || is_anonymous === 'true' || is_anonymous === 1;
+
+    if (finalAnon) {
+      // Kalau anonymous dicentang → sender_name jadi null (akan ditampilkan "Anon")
+      finalSender = null;
+    } else {
+      // Kalau tidak anonymous → pakai username dari user yang login, atau input manual
+      finalSender = user ? user.username : (sender_name || null);
     }
 
-    let image_path = null;
-    if (req.file) image_path = `/uploads/${req.file.filename}`;
+    const image_path = image_url || null;
 
-    const stmt = db.prepare('INSERT INTO messages (user_id,sender_name,is_anonymous,recipient_name,message,image_path) VALUES (?,?,?,?,?,?)');
-    const userId = user ? user.id : null;
-    const info = stmt.run(userId, sender_name || null, is_anonymous ? 1 : 0, recipient_name, message, image_path);
-    const row = db.prepare('SELECT * FROM messages WHERE id = ?').get(info.lastInsertRowid);
-    if (row.is_anonymous) row.sender_name = 'Anon';
-    return res.status(201).json({ success:true, data: row });
+    const q = `
+      INSERT INTO messages (user_id, sender_name, is_anonymous, recipient_name, message, image_path)
+      VALUES ($1,$2,$3,$4,$5,$6)
+      RETURNING *;
+    `;
+
+    const result = await db.query(q, [
+      user ? user.id : null,
+      finalSender,
+      finalAnon,
+      recipient_name,
+      message,
+      image_path
+    ]);
+
+    const row = result.rows[0];
+    
+    // ✅ Override display name di response
+    if (row.is_anonymous) {
+      row.sender_name = "Anon";
+    }
+
+    res.status(201).json({ success: true, data: row });
+
   } catch (err) { next(err); }
 };
 
-const listMessages = (req, res, next) => {
+
+const listMessages = async (req, res, next) => {
   try {
-    const page = parseInt(req.query.page||1);
-    const pageSize = parseInt(req.query.pageSize||10);
-    const offset = (page-1)*pageSize;
+    const page = parseInt(req.query.page || 1);
+    const pageSize = parseInt(req.query.pageSize || 10);
+    const offset = (page - 1) * pageSize;
     const recipient = req.query.recipient;
-    const where = ['is_deleted = 0', 'is_approved = 1'];
+
+    const where = ['is_deleted = FALSE', 'is_approved = TRUE'];
     const params = [];
 
-    if (recipient) { where.push('recipient_name LIKE ?'); params.push(`%${recipient}%`); }
+    if (recipient) {
+      params.push(`%${recipient}%`);
+      where.push(`recipient_name ILIKE $${params.length}`);
+    }
 
-    const totalStmt = db.prepare(`SELECT COUNT(*) as cnt FROM messages WHERE ${where.join(' AND ')}`);
-    const total = totalStmt.get(...params).cnt;
+    const totalQuery = `SELECT COUNT(*) AS cnt FROM messages WHERE ${where.join(' AND ')}`;
+    const totalResult = await db.query(totalQuery, params);
+    const total = parseInt(totalResult.rows[0].cnt, 10);
 
-    const stmt = db.prepare(`SELECT * FROM messages WHERE ${where.join(' AND ')} ORDER BY created_at DESC LIMIT ? OFFSET ?`);
-    const rows = stmt.all(...params, pageSize, offset).map(r => {
+    params.push(pageSize);
+    params.push(offset);
+
+    const dataQuery = `
+      SELECT * FROM messages
+      WHERE ${where.join(' AND ')}
+      ORDER BY created_at DESC
+      LIMIT $${params.length - 1} OFFSET $${params.length};
+    `;
+
+    const dataResult = await db.query(dataQuery, params);
+    const rows = dataResult.rows.map(r => {
       if (r.is_anonymous) r.sender_name = 'Anon';
       return r;
     });
 
-    return res.json({ success:true, data: rows, meta: { page, pageSize, total } });
+    res.json({ success: true, data: rows, meta: { page, pageSize, total } });
   } catch (err) { next(err); }
 };
 
-const getMessage = (req, res, next) => {
+const getMessage = async (req, res, next) => {
+  try {
+    const q = `
+      SELECT * FROM messages
+      WHERE id = $1 AND is_deleted = FALSE
+    `;
+
+    const result = await db.query(q, [req.params.id]);
+
+    if (result.rows.length === 0)
+      return res.status(404).json({ success: false, message: 'Not found' });
+
+    const msg = result.rows[0];
+    if (msg.is_anonymous) msg.sender_name = 'Anon';
+
+    res.json({ success: true, data: msg });
+  } catch (err) { next(err); }
+};
+
+const listByRecipient = async (req, res, next) => {
+  try {
+    const result = await db.query(
+      `SELECT * FROM messages 
+       WHERE recipient_name ILIKE $1
+       AND is_deleted = FALSE 
+       AND is_approved = TRUE
+       ORDER BY created_at DESC`,
+      [`%${req.params.name}%`]
+    );
+
+    const rows = result.rows.map(r => {
+      if (r.is_anonymous) r.sender_name = 'Anon';
+      return r;
+    });
+
+    res.json({ success: true, data: rows });
+  } catch (err) { next(err); }
+};
+
+const reportMessage = async (req, res, next) => {
   try {
     const id = req.params.id;
-    const row = db.prepare('SELECT * FROM messages WHERE id = ? AND is_deleted = 0').get(id);
-    if (!row) return res.status(404).json({ success:false, message:'Not found' });
-    if (row.is_anonymous) row.sender_name = 'Anon';
-    return res.json({ success:true, data: row });
+
+    const exists = await db.query(`SELECT id FROM messages WHERE id=$1`, [id]);
+    if (exists.rows.length === 0)
+      return res.status(404).json({ success: false, message: 'Message not found' });
+
+    await db.query(`INSERT INTO reports (message_id, reason) VALUES ($1,$2)`, [id, req.body.reason || null]);
+    await db.query(`UPDATE messages SET reports_count = reports_count + 1 WHERE id=$1`, [id]);
+
+    res.json({ success: true, message: 'Reported' });
   } catch (err) { next(err); }
 };
 
-const listByRecipient = (req, res, next) => {
+// ✅ LIKE (increment)
+const likeMessage = async (req, res, next) => {
   try {
-    const name = req.params.name;
-    const stmt = db.prepare('SELECT * FROM messages WHERE recipient_name LIKE ? AND is_deleted = 0 AND is_approved = 1 ORDER BY created_at DESC');
-    const rows = stmt.all(`%${name}%`).map(r => { if (r.is_anonymous) r.sender_name = 'Anon'; return r; });
-    return res.json({ success:true, data: rows });
+    const messageId = req.params.id;
+
+    await db.query(
+      `UPDATE messages SET likes_count = likes_count + 1 WHERE id = $1`,
+      [messageId]
+    );
+
+    const row = await db.query(
+      `SELECT likes_count FROM messages WHERE id = $1`,
+      [messageId]
+    );
+
+    res.json({ 
+      success: true, 
+      likes_count: row.rows[0].likes_count,
+      action: 'like'
+    });
+  } catch (err) { 
+    next(err); 
+  }
+};
+
+// ✅ UNLIKE (decrement)
+const unlikeMessage = async (req, res, next) => {
+  try {
+    const messageId = req.params.id;
+
+    await db.query(
+      `UPDATE messages 
+       SET likes_count = GREATEST(0, likes_count - 1) 
+       WHERE id = $1`,
+      [messageId]
+    );
+
+    const row = await db.query(
+      `SELECT likes_count FROM messages WHERE id = $1`,
+      [messageId]
+    );
+
+    res.json({ 
+      success: true, 
+      likes_count: row.rows[0].likes_count,
+      action: 'unlike'
+    });
+  } catch (err) { 
+    next(err); 
+  }
+};
+
+const updateMessage = async (req, res, next) => {
+  try {
+    const { recipient_name, message, is_anonymous, image_url } = req.body;
+
+    const image_path = image_url || null;
+
+    const q = `
+      UPDATE messages
+      SET 
+        recipient_name = COALESCE($1, recipient_name),
+        message        = COALESCE($2, message),
+        image_path     = COALESCE($3, image_path),
+        is_anonymous   = COALESCE($4, is_anonymous),
+        updated_at     = NOW()
+      WHERE id = $5
+      RETURNING *;
+    `;
+
+    const result = await db.query(q, [
+      recipient_name,
+      message,
+      image_path,
+      is_anonymous,
+      req.params.id
+    ]);
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ success: false, message: 'Message not found' });
+    }
+
+    const row = result.rows[0];
+    if (row.is_anonymous) row.sender_name = "Anon";
+
+    res.json({ success: true, data: row });
+
   } catch (err) { next(err); }
 };
 
-const reportMessage = (req, res, next) => {
+const setAnonymize = async (req, res, next) => {
   try {
     const id = req.params.id;
-    const reason = req.body.reason || null;
+    const is_anonymous = req.body.is_anonymous ? true : false;
     
-    // Verify message exists
-    const msgExists = db.prepare('SELECT id FROM messages WHERE id = ?').get(id);
-    if (!msgExists) return res.status(404).json({ success:false, message:'Message not found' });
+    console.log('🔧 Setting anonymize:', { id, is_anonymous }); // ← tambahkan log
     
-    // Insert report
-    db.prepare('INSERT INTO reports (message_id,reason) VALUES (?,?)').run(id, reason);
-    db.prepare('UPDATE messages SET reports_count = reports_count + 1 WHERE id = ?').run(id);
-    return res.json({ success:true, message:'Reported' });
-  } catch (err) { next(err); }
+    const result = await db.query(
+      `UPDATE messages 
+       SET is_anonymous = $1, updated_at = NOW() 
+       WHERE id = $2
+       RETURNING *`,
+      [is_anonymous, id]
+    );
+    
+    if (result.rows.length === 0) {
+      return res.status(404).json({ success: false, message: 'Message not found' });
+    }
+
+    console.log('✅ Updated:', result.rows[0]); // ← tambahkan log
+
+    res.json({ success: true, data: result.rows[0] });
+  } catch (err) { 
+    console.error('❌ Error setAnonymize:', err);
+    next(err); 
+  }
 };
 
-const likeMessage = (req, res, next) => {
+
+const setApprove = async (req, res, next) => {
   try {
     const id = req.params.id;
-    db.prepare('UPDATE messages SET likes_count = likes_count + 1 WHERE id = ?').run(id);
-    const row = db.prepare('SELECT likes_count FROM messages WHERE id = ?').get(id);
-    return res.json({ success:true, data: row });
-  } catch (err) { next(err); }
+    const is_approved = req.body.is_approved ? true : false;
+    
+    const result = await db.query(
+      `UPDATE messages 
+       SET is_approved = $1, updated_at = NOW() 
+       WHERE id = $2
+       RETURNING *`,
+      [is_approved, id]
+    );
+    
+    if (result.rows.length === 0) {
+      return res.status(404).json({ success: false, message: 'Message not found' });
+    }
+
+    res.json({ success: true, data: result.rows[0] });
+  } catch (err) { 
+    console.error('Error setApprove:', err);
+    next(err); 
+  }
 };
 
-const unlikeMessage = (req, res, next) => {
+const deleteMessage = async (req, res, next) => {
   try {
-    const id = req.params.id;
-    // Logika: Kurangi 1, tapi jangan sampai minus (MAX 0)
-    db.prepare('UPDATE messages SET likes_count = MAX(0, likes_count - 1) WHERE id = ?').run(id);
-    const row = db.prepare('SELECT likes_count FROM messages WHERE id = ?').get(id);
-    return res.json({ success:true, data: row });
+    const result = await db.query(`DELETE FROM messages WHERE id=$1`, [req.params.id]);
+    
+    if (result.rowCount === 0) {
+      return res.status(404).json({ success: false, message: 'Message not found' });
+    }
+
+    res.json({ success: true });
   } catch (err) { next(err); }
 };
 
-const updateMessage = (req, res, next) => {
+const softDeleteMessage = async (req, res, next) => {
   try {
-    const id = req.params.id;
-    const { recipient_name, message, is_anonymous } = req.body;
-    let image_path = null;
-    if (req.file) image_path = `/uploads/${req.file.filename}`;
+    const result = await db.query(
+      `UPDATE messages SET is_deleted = TRUE WHERE id = $1`, 
+      [req.params.id]
+    );
 
-    const stmt = db.prepare('UPDATE messages SET recipient_name = COALESCE(?,recipient_name), message = COALESCE(?,message), image_path = COALESCE(?,image_path), is_anonymous = COALESCE(?,is_anonymous), updated_at = CURRENT_TIMESTAMP WHERE id = ?');
-    stmt.run(recipient_name, message, image_path, is_anonymous, id);
+    if (result.rowCount === 0) {
+      return res.status(404).json({ success: false, message: 'Message not found' });
+    }
 
-    const row = db.prepare('SELECT * FROM messages WHERE id = ?').get(id);
-    if (row.is_anonymous) row.sender_name = 'Anon';
-    return res.json({ success:true, data: row });
+    res.json({ success: true });
   } catch (err) { next(err); }
 };
 
-const setAnonymize = (req,res,next) => {
-  try {
-    const id = req.params.id;
-    const is_anonymous = req.body.is_anonymous ? 1 : 0;
-    db.prepare('UPDATE messages SET is_anonymous = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?').run(is_anonymous, id);
-    return res.json({ success:true });
-  } catch (err) { next(err); }
-};
-
-const setApprove = (req,res,next) => {
-  try {
-    const id = req.params.id;
-    const is_approved = req.body.is_approved ? 1 : 0;
-    db.prepare('UPDATE messages SET is_approved = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?').run(is_approved, id);
-    return res.json({ success:true });
-  } catch (err) { next(err); }
-};
-
-const updateImage = (req,res,next) => {
-  try {
-    const id = req.params.id;
-    if (!req.file) return res.status(400).json({ success:false, message:'Image required' });
-    const image_path = `/uploads/${req.file.filename}`;
-    db.prepare('UPDATE messages SET image_path = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?').run(image_path, id);
-    return res.json({ success:true, data: { image_path } });
-  } catch (err) { next(err); }
-};
-
-const deleteMessage = (req,res,next) => {
-  try {
-    const id = req.params.id;
-    db.prepare('DELETE FROM messages WHERE id = ?').run(id);
-    return res.json({ success:true });
-  } catch (err) { next(err); }
-};
-
-const softDeleteMessage = (req,res,next) => {
-  try {
-    const id = req.params.id;
-    db.prepare('UPDATE messages SET is_deleted = 1 WHERE id = ?').run(id);
-    return res.json({ success:true });
-  } catch (err) { next(err); }
-};
-
-const bulkDelete = (req,res,next) => {
+const bulkDelete = async (req, res, next) => {
   try {
     const { ids } = req.body;
-    if (!Array.isArray(ids)) return res.status(400).json({ success:false, message:'ids array required' });
-    const placeholders = ids.map(()=>'?').join(',');
-    const stmt = db.prepare(`DELETE FROM messages WHERE id IN (${placeholders})`);
-    const info = stmt.run(...ids);
-    return res.json({ success:true, deletedCount: info.changes });
-  } catch (err) { next(err); }
+
+    // ✅ Validasi input
+    if (!Array.isArray(ids) || ids.length === 0) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'ids array required and must not be empty' 
+      });
+    }
+
+    // ✅ Validasi semua ID adalah integer
+    if (!ids.every(id => Number.isInteger(id))) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'All ids must be integers' 
+      });
+    }
+
+    const placeholders = ids.map((_, i) => `$${i + 1}`).join(',');
+    const q = `DELETE FROM messages WHERE id IN (${placeholders})`;
+    const result = await db.query(q, ids);
+
+    res.json({ 
+      success: true, 
+      deletedCount: result.rowCount,
+      message: `${result.rowCount} message(s) deleted`
+    });
+  } catch (err) { 
+    console.error('Error bulkDelete:', err);
+    next(err); 
+  }
 };
 
 module.exports = {
   createMessage, listMessages, getMessage, listByRecipient,
-  reportMessage, likeMessage, unlikeMessage, updateMessage, setAnonymize, setApprove, updateImage,
-  deleteMessage, softDeleteMessage, bulkDelete
+  reportMessage, 
+  likeMessage,     // ← keep
+  unlikeMessage,   // ← keep
+  updateMessage,
+  setAnonymize, setApprove, deleteMessage,
+  softDeleteMessage, bulkDelete
 };

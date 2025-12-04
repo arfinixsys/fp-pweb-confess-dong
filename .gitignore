@@ -3,8 +3,9 @@ node_modules/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
-package-lock.json  # opsional, tapi biasanya di-ignore
-yarn.lock          # opsional
+
+# JANGAN ignore package-lock.json (wajib untuk deploy)
+# package-lock.json  ← HAPUS BARIS INI
 
 # Environment variables
 .env
@@ -12,27 +13,28 @@ yarn.lock          # opsional
 .env.development.local
 .env.test.local
 .env.production.local
+.env.production
 
-# Database SQLite
-*.sqlite
-*.sqlite3
-*.db
-database.sqlite
-db.sqlite3
-
-# Build output (React)
+# Build output
 build/
 dist/
 .next/
 out/
+*.tsbuildinfo
 
-# React
+# React/Vite cache
 .eslintcache
+.cache/
+.temp/
+.vite/
+vite.config.js.timestamp-*
 
 # Logs
 logs/
 *.log
 npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
 pids
 *.pid
 *.seed
@@ -47,6 +49,7 @@ pids
 ehthumbs.db
 Thumbs.db
 desktop.ini
+**/.DS_Store
 
 # IDE/Editor
 .vscode/
@@ -57,26 +60,40 @@ desktop.ini
 .project
 .classpath
 .settings/
+*.sublime-project
+*.sublime-workspace
 
 # Temporary files
 *.tmp
+*.bak
 .cache/
 .temp/
-*.bak
 
-# Coverage directory
+# Test coverage
 coverage/
 .nyc_output/
+*.lcov
 
-# Optional npm cache directory
+# Optional npm cache
 .npm
 
-# Optional eslint cache
-.eslintcache
-
-# Uploads (jika ada fitur upload file)
+# Uploads (user-generated files)
 uploads/*
 !uploads/.gitkeep
 
-# Mac files
+# Database backups (jika ada)
+*.sql.gz
+*.dump
+backups/
+
+# Vercel
+.vercel
+.vercel/
+
+# Railway
+railway.json
+
+# macOS
 **/.DS_Store
+.AppleDouble
+.LSOverride
